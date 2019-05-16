@@ -1,0 +1,20 @@
+cplex
+cvxpy
+dccp
+dill
+nose
+pandas
+numpy
+scipy
+scikit-learn
+imblearn
+anytree
+matplotlib
+prettytable
+seaborn
+traitlets
+IPython
+rpy2
+R 3.2.0
+
+
