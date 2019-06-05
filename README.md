@@ -4,8 +4,6 @@ This repository contains a software implementation of the methods described in:
 Berk Ustun, Yang Liu, David Parkes   
 International Conference on Machine Learning (ICML), 2019
 
----
-
 ## Installation
 
 #### Requirements
