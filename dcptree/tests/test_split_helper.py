@@ -3,13 +3,13 @@ from dcptree.data_io import load_processed_data
 from dcptree.cross_validation import filter_data_to_fold
 from dcptree.group_helper import *
 from dcptree.classification_models import *
+from dcptree.paths import *
+from dcptree.tree import DecoupledTrainer
 
 #directories
 data_name = 'adult'
 format_label = 'envyfree'
 random_seed = 2338
-repo_dir = '/Users/berk/Dropbox (MIT)/Research/Envy-Free Classification/fair_decoupling/'
-data_dir = repo_dir + 'data/'
 selected_groups = ['Race', 'Sex']
 
 ## load data
@@ -19,8 +19,6 @@ data, cvindices = load_processed_data(data_file)
 # filter to fold
 data = filter_data_to_fold(data, cvindices, fold_id = 'K05N01', fold_num = 0, include_validation = True)
 
-# sample test data
-#data = sample_test_data_with_partitions(data, n_samples = 10000, scramble = True, random_seed = 1337)
 
 # remove selected groups
 data, groups = split_groups_from_data(data = data, group_names = selected_groups)
@@ -31,7 +29,7 @@ data = cast_numeric_fields(data)
 def test_feasible_names():
 
     node_idx = np.ones(data['X'].shape[0], dtype = bool)
-    sh = SplitHelper(groups = groups, node_idx = node_idx)
+    sh = DecoupledTrainer(groups = groups, node_idx = node_idx)
 
     for name in groups:
         assert name in sh.feasible_names
@@ -76,7 +74,7 @@ def test_feasible_names():
 def test_splits():
 
     node_idx = np.ones(data['X'].shape[0], dtype = bool)
-    sh = SplitHelper(groups = groups, node_idx = node_idx)
+    sh = DecoupledTrainer(groups = groups, node_idx = node_idx)
 
     for name, label in sh.splits:
 
@@ -104,7 +102,7 @@ def test_splits():
 def test_split_indices():
 
     node_idx = np.random.randint(low = 0, high = 2, size = data['X'].shape[0])
-    sh = SplitHelper(groups = groups, node_idx = node_idx)
+    sh = DecoupledTrainer(groups = groups, node_idx = node_idx)
 
     for name, label in sh.splits:
 
@@ -117,8 +115,8 @@ def test_split_indices():
 def test_infeasible():
 
     node_idx = np.ones(data['X'].shape[0], dtype = bool)
-    sh = SplitHelper(groups = groups, node_idx = node_idx)
-    inf_codes = list(SplitHelper.INFEASIBILITY_CODES)
+    sh = DecoupledTrainer(groups = groups, node_idx = node_idx)
+    inf_codes = list(DecoupledTrainer.INFEASIBILITY_CODES)
 
     for name, label in sh.splits:
 
@@ -157,7 +155,7 @@ def test_infeasible():
 def test_iteration():
 
     node_idx = np.ones(data['X'].shape[0], dtype = bool)
-    sh = SplitHelper(groups = groups, node_idx = node_idx)
+    sh = DecoupledTrainer(groups = groups, node_idx = node_idx)
     test_model = 'test'
 
     assert not sh.finished()
@@ -189,7 +187,7 @@ def test_iteration():
 def test_sample_infeasibility():
 
     node_idx = np.ones(data['X'].shape[0], dtype = bool)
-    sh = SplitHelper(groups = groups, node_idx = node_idx)
+    sh = DecoupledTrainer(groups = groups, node_idx = node_idx)
     sh.set_sample_infeasibility(min_samples = 0, propagate_to_group = True)
     assert len(sh.infeasible_names) == 0
 
