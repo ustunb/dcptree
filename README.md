@@ -5,12 +5,10 @@ Berk Ustun, Yang Liu, David Parkes
 International Conference on Machine Learning (ICML), 2019
 
 ---
-
 ### Installation
-
 ---
 
-This code requires:
+#### Requirements
 
 - Python 3
 - CPLEX
@@ -29,9 +27,7 @@ If you have problems installing CPLEX, check the [CPLEX user manual](http://www-
  
    
 ---
-
 ### Development
-
 ---
 
 The code in this repository is currently under active development, and may therefore change substantially with each commit.   
@@ -39,7 +35,6 @@ The code in this repository is currently under active development, and may there
    
 ---
 ### Reference
-
 ---
 
 
