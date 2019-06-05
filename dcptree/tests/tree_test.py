@@ -1,4 +1,5 @@
 import os
+from dcptree.paths import *
 from dcptree.data import *
 from dcptree.data_io import load_processed_data
 from dcptree.cross_validation import filter_data_to_fold
@@ -6,27 +7,21 @@ from dcptree.group_helper import *
 from dcptree.classification_models import *
 from dcptree.tree import *
 
+
 #directories
 data_name = 'adult'
 format_label = 'envyfree'
 random_seed = 1337
 repo_dir = os.getcwd() + '/'
-
-if os.path.basename(os.path.normpath(repo_dir)) == 'fair_decoupling':
-    repo_dir = os.path.abspath(os.path.dirname(os.path.dirname(repo_dir))) + '/'
-
 data_dir = repo_dir + 'data/'
-selected_groups = ['Race', 'Sex']
+selected_groups = ['Sex']
 
 ## load data
-data_file = '%s%s_%s_processed.pickle' % (data_dir, data_name, format_label)
+data_file = '%s%s_processed.pickle' % (data_dir, data_name)
 data, cvindices = load_processed_data(data_file)
 
 # filter to fold
 data = filter_data_to_fold(data, cvindices, fold_id = 'K05N01', fold_num = 0, include_validation = True)
-
-# sample test data
-#data = sample_test_data_with_partitions(data, n_samples = 10000, scramble = True, random_seed = 1337)
 
 # remove selected groups
 data, groups = split_groups_from_data(data = data, group_names = selected_groups)

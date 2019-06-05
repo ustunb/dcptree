@@ -8,12 +8,11 @@ from dcptree.tree import DecoupledTrainer
 
 #directories
 data_name = 'adult'
-format_label = 'envyfree'
 random_seed = 2338
 selected_groups = ['Race', 'Sex']
 
 ## load data
-data_file = '%s%s_%s_processed.pickle' % (data_dir, data_name, format_label)
+data_file = '%s%s_processed.pickle' % (data_dir, data_name)
 data, cvindices = load_processed_data(data_file)
 
 # filter to fold

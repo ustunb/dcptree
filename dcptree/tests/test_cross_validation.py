@@ -2,14 +2,13 @@
 # License: BSD 3 clause
 
 import os
+from dcptree.paths import *
 from dcptree.data_io import load_processed_data, _load_folds_from_rdata, _load_cvindices_from_rdata
 from dcptree.cross_validation import filter_data_to_fold, validate_fold_id, filter_cvindices
 
 #load dataset
 data_name = 'adult'
-test_dir = os.getcwd() + '/'
-repo_dir = os.path.dirname(os.path.dirname(os.path.dirname(test_dir))) + '/'
-data_dir = repo_dir + 'data/'
+test_dir = repo_dir / 'dcptree/tests/'
 dataset_file = data_dir + data_name + '/' + data_name + 'adult_processed.data'
 weights_file = None
 helper_file = None
