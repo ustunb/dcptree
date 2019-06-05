@@ -2,10 +2,51 @@ import itertools
 import numpy as np
 from copy import deepcopy
 from dcptree.analysis import to_group_data, groups_to_group_data
-from dcptree.data import check_data, has_intercept
+from dcptree.data import check_data
 from dcptree.group_helper import check_groups
-from dcptree.classification_models import ClassificationModel
-from dcptree.tree import exact_mcn_test
+from scipy.stats import binom
+
+
+def exact_mcn_test(y, yhat1, yhat2, two_sided = False):
+    """
+    :param y: true
+    :param yhat1:
+    :param yhat2:
+    :param two_sided:
+    :return: value of the discrete McNemar Test
+    """
+
+    f1_correct = np.equal(y, yhat1)
+    f2_correct = np.equal(y, yhat2)
+
+    table = np.zeros(shape = (2, 2))
+    for i in range(2):
+        for j in range(2):
+            table[i, j] = np.sum((f1_correct == i) & (f2_correct == j))
+
+    b = table[0, 1] #f1 wrong and f2 right
+    c = table[1, 0] #f1 right and f2 wrong
+    n = b + c
+
+    # envy-freeness requires that
+    # f1 is correct more often than f2 <=> b < c
+    #
+    # We test
+    #
+    # H0: error(f1) = error(f2)
+    # H1: error(f1) > error(f2)
+    #
+    # This requires assuming b /(b+c) ~ Bin(0.5)
+
+    if two_sided:
+        test_statistic = min(b, c)
+        p = 2.0 * binom.cdf(k = min(b, c), n = b + c, p = 0.5)
+    else:
+        test_statistic = c
+        p = binom.cdf(k = test_statistic, n = n, p = 0.5)
+
+    return p, test_statistic
+
 
 
 def check_model_assignment(groups_to_models, groups, models):
@@ -16,7 +57,6 @@ def check_model_assignment(groups_to_models, groups, models):
     splits = [[(k, l) for l in v['labels']] for k, v in groups.items()]
     splits = set(itertools.product(*splits))
     assert set(groups_to_models.keys()).issubset(splits), 'mapper should include map every group in the data'
-
 
     model_indices = list(range(len(models)))
     assignment_indices = np.array(list(groups_to_models.values()))

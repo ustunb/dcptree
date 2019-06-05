@@ -2,7 +2,7 @@ import os
 import time
 import numpy as np
 import pandas as pd
-from .data import check_data, set_defaults_for_data, add_intercept,  FORMAT_NAME_RULES, FORMAT_NAME_ENVYFREE
+from .data import check_data, set_defaults_for_data, add_intercept,  FORMAT_NAME_RULES, FORMAT_NAME_DCP
 from .cross_validation import validate_folds, validate_cvindices, validate_fold_id, to_fold_id, is_inner_fold_id
 
 RAW_DATA_OUTCOME_COL_IDX = 0
@@ -287,7 +287,7 @@ def _save_data_as_rdata(file_name, data, cvindices):
     if data['format'] == FORMAT_NAME_RULES:
         fields_to_save += ["feature_groups", "feature_names", "feature_types", "feature_orderings",
                            "feature_group_limits"]
-    elif data['format'] == FORMAT_NAME_ENVYFREE:
+    elif data['format'] == FORMAT_NAME_DCP:
         fields_to_save += ['partitions']
 
     try:

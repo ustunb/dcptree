@@ -1,6 +1,5 @@
 import itertools
 import pandas as pd
-from scipy.stats import binom
 from copy import deepcopy
 from anytree import NodeMixin, RenderTree
 from inspect import getfullargspec
@@ -9,50 +8,9 @@ from dcptree.analysis import to_group_data
 from dcptree.data import check_data, has_intercept
 from dcptree.group_helper import check_groups
 from dcptree.classification_models import ClassificationModel
-from dcptree.debug import ipsh
+from dcptree.decoupled_set import build_model_assignment_map, DecoupledClassifierSet, exact_mcn_test
 
 #### Scoring and Selection ####
-
-def exact_mcn_test(y, yhat1, yhat2, two_sided = False):
-    """
-    :param y: true
-    :param yhat1:
-    :param yhat2:
-    :param two_sided:
-    :return: value of the discrete McNemar Test
-    """
-
-    f1_correct = np.equal(y, yhat1)
-    f2_correct = np.equal(y, yhat2)
-
-    table = np.zeros(shape = (2, 2))
-    for i in range(2):
-        for j in range(2):
-            table[i, j] = np.sum((f1_correct == i) & (f2_correct == j))
-
-    b = table[0, 1] #f1 wrong and f2 right
-    c = table[1, 0] #f1 right and f2 wrong
-    n = b + c
-
-    # envy-freeness requires that
-    # f1 is correct more often than f2 <=> b < c
-    #
-    # We test
-    #
-    # H0: error(f1) = error(f2)
-    # H1: error(f1) > error(f2)
-    #
-    # This requires assuming b /(b+c) ~ Bin(0.5)
-
-    if two_sided:
-        test_statistic = min(b, c)
-        p = 2.0 * binom.cdf(k = min(b, c), n = b + c, p = 0.5)
-    else:
-        test_statistic = c
-        p = binom.cdf(k = test_statistic, n = n, p = 0.5)
-
-    return p, test_statistic
-
 
 def preference_score(data, partition, pooled_model):
     """
@@ -101,9 +59,6 @@ def preference_score(data, partition, pooled_model):
     envy_free_scores = 4.0 * np.exp(-envy_free_scores)
     np.fill_diagonal(envy_free_scores, 0.0)
     score = np.sum(rationality_scores) + np.sum(envy_free_scores)
-    if not np.isfinite(score):
-        ipsh()
-
     return score
 
 
@@ -487,7 +442,7 @@ class DecouplingTree(NodeMixin):
             self._group_name = str(DecouplingTree.ROOT_GROUP_NAME)
             self._group_label = str(DecouplingTree.ROOT_GROUP_LABEL)
             self._node_indices = np.ones(self.data['X'].shape[0], dtype = bool)
-            self.max_depth = len(self.groups)
+            self._max_depth = len(self.groups)
 
             self._branch_log = []
             self._branch_iteration = 0
@@ -1342,82 +1297,73 @@ class DecouplingTree(NodeMixin):
 
     def prune(self, alpha = 0.1, test_correction = True, atomic_groups = True, objectives = ['group_gain_min', 'group_gain_max', 'group_gain_med'], **data_args):
 
-        subtrees = [t for t in self.subtrees() if len(t) >= 2]
+        assert 0.0 <= alpha <= 1.0
         stats = []
-        if atomic_groups:
+        subtrees = [t for t in self.subtrees() if len(t) >= 2]
 
-            for p in subtrees:
+        for p in subtrees:
 
-                keep_idx = np.greater(p.group_sample_size_stats(metric_type = 'n'), 0)
+            if atomic_groups:
+                training_sizes = p.partition_sample_size_stats(parent_type = 'self', metric_type = 'n', **data_args)
                 group_sizes = p.group_sample_size_stats(metric_type = 'n', **data_args)
-                group_weights = group_sizes / np.nansum(group_sizes)
                 gain = p.group_decoupling_stats(metric_type = 'error_gap', parent_type = 'root', **data_args)
-                gain = gain[keep_idx]
-                group_weights = group_weights[keep_idx]
                 pvals_gain = p.group_decoupling_stats(metric_type = 'pvalue', parent_type = 'root', **data_args)
                 pvals_switch = p.group_switch_stats(metric_type = 'pvalue', **data_args)
+            else:
                 training_sizes = p.partition_sample_size_stats(parent_type = 'self', metric_type = 'n', **data_args)
-
-                if test_correction:
-                    n_tests = np.isfinite(pvals_switch).sum() + np.isfinite(pvals_gain).sum()
-                else:
-                    n_tests = 1.0
-
-                stats.append({
-                    'name': p.name,
-                    'n_leaves': len(p),
-                    'n_missing_data': np.sum(group_sizes == 0),
-                    'alpha': alpha / n_tests,
-                    'p_violation_min': np.minimum(np.nanmin(pvals_gain), np.nanmin(pvals_switch)),
-                    'violations_switch': np.less_equal(pvals_gain, (alpha / n_tests)).sum(),
-                    'violations_decouple': np.less_equal(pvals_gain, (alpha / n_tests)).sum(),
-                    'weighted_gain': group_weights.dot(gain),
-                    'group_gain_min': np.min(gain),
-                    'group_gain_med': np.median(gain),
-                    'group_gain_max': np.max(gain),
-                    'sample_size_min': np.min(training_sizes),
-                    'sample_size_med': np.median(training_sizes),
-                    'sample_size_max': np.max(training_sizes),
-                    })
-        else:
-
-            for p in subtrees:
-
-                group_sizes = p.partition_sample_size_stats(parent_type = 'self', metric_type = 'n', **data_args)
-                group_weights = group_sizes / np.nansum(group_sizes)
+                group_sizes = training_sizes
                 gain = p.partition_decoupling_stats(metric_type = 'error_gap', parent_type = 'root', **data_args)
                 pvals_gain = p.partition_decoupling_stats(metric_type = 'pvalue', parent_type = 'root', **data_args)
                 pvals_switch = p.partition_stat_matrix(metric_type = 'pvalue', **data_args)
 
-                if test_correction:
-                    n_tests = np.isfinite(pvals_switch).sum() + np.isfinite(pvals_gain).sum()
-                else:
-                    n_tests = 1.0
+            # in case some groups aren't observed
+            group_weights = group_sizes / np.sum(group_sizes)
+            keep_idx = np.greater(group_sizes, 0)
+            gain = gain[keep_idx]
+            group_weights = group_weights[keep_idx]
 
-                stats.append({
-                    'name': p.name,
-                    'n_leaves': len(p),
-                    'n_missing_data': np.sum(group_sizes == 0),
-                    'alpha': alpha / n_tests,
-                    'p_violation_min': np.minimum(np.nanmin(pvals_gain), np.nanmin(pvals_switch)),
-                    'violations_switch': np.less_equal(pvals_gain, (alpha / n_tests)).sum(),
-                    'violations_decouple': np.less_equal(pvals_gain, (alpha / n_tests)).sum(),
-                    'weighted_gain': group_weights.dot(gain),
-                    'group_gain_min': np.min(gain),
-                    'group_gain_med': np.median(gain),
-                    'group_gain_max': np.max(gain),
-                    'sample_size_min': np.min(group_sizes),
-                    'sample_size_med': np.median(group_sizes),
-                    'sample_size_max': np.max(group_sizes),
-                    })
+            # compute correct alpha
+            n_tests = np.isfinite(pvals_switch).sum() + np.isfinite(pvals_gain).sum()
+            alpha_test = alpha / n_tests if test_correction else alpha
 
+            stats.append({
+                'name': p.name,
+                'n_leaves': len(p),
+                'alpha_raw': alpha,
+                'n_tests': n_tests,
+                'alpha': alpha / n_tests,
+                #
+                'p_violation_min': np.minimum(np.nanmin(pvals_gain), np.nanmin(pvals_switch)),
+                'violations_switch': np.less_equal(pvals_switch, alpha_test, where = np.isfinite(pvals_switch)).sum(),
+                'violations_decouple': np.less_equal(pvals_gain, alpha_test).sum(),
+                #
+                'weighted_gain': group_weights.dot(gain),
+                #
+                'group_gain_min': np.min(gain),
+                'group_gain_med': np.median(gain),
+                'group_gain_max': np.max(gain),
+                #
+                'sample_size_min': np.min(training_sizes),
+                'sample_size_med': np.median(training_sizes),
+                'sample_size_max': np.max(training_sizes),
+                })
+
+        # prune
         df = pd.DataFrame(stats)
-        df = df.query('p_violation_min >= alpha')
-        df = df.sort_values(objectives, ascending = False)
-        self.partition = subtrees[df.index[0]]
-        self.render()
-        return df
+        df['pruned'] = df['alpha'] >= df['p_violation_min']
+        pruning_df = df.query('p_violation_min >= alpha').sort_values(objectives, ascending = False)
+        self.partition = subtrees[pruning_df.index[0]]
 
+        # return alternative trees
+        candidate_trees = []
+        pooled_model = self.root.model
+        data = data_args.get('data', self.root.data)
+        groups = data_args.get('groups', self.root.groups)
+        for t in subtrees:
+            dcs = DecoupledClassifierSet(data = data, groups = groups, pooled_model = pooled_model, decoupled_models = [l.model for l in t.leaves], groups_to_models = build_model_assignment_map(t))
+            candidate_trees.append(dcs)
+
+        return df, candidate_trees
 
     @property
     def partition(self):
@@ -2175,5 +2121,3 @@ class DecoupledLeafSet(object):
                     S[i] = metric_value
 
         return S
-
-

@@ -9,12 +9,21 @@ from dcptree.classification_models import ClassificationModel
 class CoupledRiskMinimizer(object):
     """
     This object trains the preferential fairness classifiers from Zafar et al. 2017 (https://arxiv.org/abs/1707.00010)
-    We have adapted their code, adding the following improvements:
-    - Ability to define constraints for 3+ subgroups
-    - Ability to use a sparse formulation to reduce runtime
+
+    The code is adapted from their codebase, which is available at:
+
+        https://github.com/mbilalzafar/fair-classification/
+
+    The changes implemented here include:
+
     - Python 3 compatability
-    It will produce the same results as the LinearClf class at:
-    https://github.com/mbilalzafar/fair-classification/blob/master/fair_classification/linear_clf_pref_fairness.py
+    - Ability to handle 3+ groups
+    - Ability to stamp a "sparse formulation" that reduces runtime
+
+    The function has been tested to produce the same results as the LinearClf object in:
+
+    - https://github.com/mbilalzafar/fair-classification/blob/master/fair_classification/linear_clf_pref_fairness.py
+
     """
 
     MU = 1.2
@@ -236,7 +245,6 @@ class CoupledRiskMinimizer(object):
 
 
 
-
     def switch_margins(self, dist_dict):
         """
         computes the ramp function for each group to estimate the acceptance rate
@@ -379,6 +387,7 @@ class CoupledRiskMinimizer(object):
     def prob(self):
         return self._prob
 
+
     def classifier(self):
         if self.train_multiple:
             return {k: self._coefs_to_classifier(coefs) for k, coefs in self.w.items()}
@@ -393,7 +402,7 @@ class CoupledRiskMinimizer(object):
         coefficients = coefs[self._coefficient_idx]
         clf = ClassificationModel(predict_handle = lambda X: np.sign(X[:, coefficient_idx].dot(coefficients) + intercept),
                                   model_type = ClassificationModel.LINEAR_MODEL_TYPE,
-                                  model_info = {'intercept':intercept, 'coefficients': coefficients})
+                                  model_info = {'intercept':intercept, 'coefficients': coefficients, 'coefficient_idx': coefficient_idx})
 
 
         return clf

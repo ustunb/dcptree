@@ -7,12 +7,10 @@ from dcptree.group_helper import *
 from dcptree.classification_models import *
 from dcptree.tree import *
 
-
 #directories
 data_name = 'adult'
 format_label = 'envyfree'
 random_seed = 1337
-repo_dir = os.getcwd() + '/'
 data_dir = repo_dir + 'data/'
 selected_groups = ['Sex']
 

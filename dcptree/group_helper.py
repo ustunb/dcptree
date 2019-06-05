@@ -175,7 +175,6 @@ def get_variable_mode(data, name):
 def convert_remaining_groups_to_rules(data):
 
     remaining_groups = list(data['partitions'])
-
     for name in remaining_groups:
         top_group = get_variable_mode(data, name)
         data = convert_group_to_rules(data, name, baseline_labels = [top_group])

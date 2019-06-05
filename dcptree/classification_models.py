@@ -49,11 +49,6 @@ class ClassificationModel(object):
         if training_info is None:
             training_info = dict()
 
-        # check predict handle
-        assert callable(predict_handle)
-        spec = getfullargspec(predict_handle)
-        assert 'X' in spec.args
-
         # check other fields
         assert isinstance(model_type, str)
         assert isinstance(model_info, dict)
@@ -61,51 +56,57 @@ class ClassificationModel(object):
         assert model_type in ClassificationModel.SUPPORTED_MODEL_TYPES, "unsupported model type"
 
         # initialize properties
-        self.predict_handle = predict_handle
         self._model_type = str(model_type)
         self._model_info = deepcopy(model_info)
         self._training_info = deepcopy(training_info)
 
         if self._model_type is ClassificationModel.LINEAR_MODEL_TYPE:
-            self._coefficients = np.array(self._model_info['coefficients'])
-            self._intercept = np.array(self._model_info['intercept'])
+            self._intercept = float(self._model_info['intercept'])
+            self._coefficients = np.array(self._model_info['coefficients']).flatten()
+            self._predict_handle = lambda X: np.sign(X[:, model_info['coefficient_idx']].dot(self._coefficients) + self._intercept)
+        else:
+            self._intercept = None
+            self._coefficients = None
+            self._predict_handle = deepcopy(predict_handle)
 
         assert self.check_rep()
 
-
     def predict(self, X):
-        return np.array(self.predict_handle(X)).flatten()
-
+        return self._predict_handle(X).flatten()
 
     @property
     def model_type(self):
-        return str(self._model_type)
-
+        return self._model_type
 
     @property
     def model_info(self):
-        return deepcopy(self._model_info)
+        return self._model_info
 
     @property
     def coefficients(self):
-        if self._model_type is ClassificationModel.LINEAR_MODEL_TYPE:
-            return np.array(self._model_info['coefficients']).flatten()
+        return self._coefficients
 
     @property
     def intercept(self):
-        if self._model_type is ClassificationModel.LINEAR_MODEL_TYPE:
-            return np.array(self._model_info['intercept'])
+        return self._intercept
 
     @property
     def training_info(self):
-        return deepcopy(self._training_info)
-
+        return self._training_info
 
     def check_rep(self):
-        assert callable(self.predict_handle)
+        assert callable(self._predict_handle)
+        spec = getfullargspec(self._predict_handle)
+        assert 'X' in spec.args
         assert isinstance(self.model_type, str)
         assert isinstance(self.model_info, dict)
         assert isinstance(self.training_info, dict)
+        if self._model_type is ClassificationModel.LINEAR_MODEL_TYPE:
+            assert np.isfinite(self._intercept)
+            assert np.isfinite(self._coefficients).all()
+        else:
+            assert self._intercept is None
+            assert self._coefficients is None
         return True
 
 
@@ -166,20 +167,23 @@ def train_sklearn_linear_model(data, method_name, settings = None, normalize_var
     clf.fit(X, y)
 
     # store classifier parameters
-    intercept = np.array(clf.intercept_) if settings['fit_intercept'] else 0.0
-    coefficients = np.array(clf.coef_)
+    b = np.array(clf.intercept_) if settings['fit_intercept'] else 0.0
+    w = np.array(clf.coef_)
 
     # adjust coefficients for unnormalized data
     if normalize_variables:
-        coefficients = coefficients * x_scale
-        intercept = intercept + np.dot(coefficients, x_shift)
+        w = w * x_scale
+        b = b + np.dot(w, x_shift)
+
+    w = np.array(w).flatten()
+    b = np.float(b)
 
     # setup parameters for model object
-    predict_handle = lambda X: np.sign(X[:, coefficient_idx].dot(coefficients.transpose()) + intercept)
+    predict_handle = lambda X: np.sign(X[:, coefficient_idx].dot(w) + b)
 
     model_info = {
-        'intercept': intercept,
-        'coefficients': coefficients,
+        'intercept': b,
+        'coefficients': w,
         'coefficient_idx': coefficient_idx,
         }
 
@@ -191,7 +195,6 @@ def train_sklearn_linear_model(data, method_name, settings = None, normalize_var
         }
 
     training_info.update(settings)
-
     model = ClassificationModel(predict_handle = predict_handle,
                                 model_type = ClassificationModel.LINEAR_MODEL_TYPE,
                                 model_info = model_info,

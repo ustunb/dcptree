@@ -17,7 +17,7 @@ VALID_VAR_TYPES = {'numeric', 'boolean', 'ordinal', 'categorical'}
 STAT_TYPE_NAMES = {'train', 'validation', 'test'}
 FORMAT_NAME_DEFAULT = 'standard'
 FORMAT_NAME_RULES = 'rules'
-FORMAT_NAME_ENVYFREE = 'envyfree'
+FORMAT_NAME_DCP = 'dcptree'
 NUMERIC_FIELDS_NAMES = {'X', 'Y', 'sample_weights',
                         'X_validation','Y_validation', 'sample_weights_validation',
                         'X_test','Y_test','sample_weights_test'}
@@ -125,7 +125,7 @@ def check_data(data, ready_for_training = False):
 
     if 'format' in data:
 
-        if data['format'] == FORMAT_NAME_ENVYFREE:
+        if data['format'] == FORMAT_NAME_DCP:
 
             assert 'partitions' in data
             assert isinstance(data['partitions'], list)
